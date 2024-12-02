@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tkinter as tk
 import psutil
 import winreg
@@ -32,11 +33,10 @@ class TaskManagerWindow:
      def task_manager_window(self) -> None:
           menu = menu_create(
                root=self.main,
-               columns=('Back', 'Kill process', 'Search'),
+               columns=('Back', 'Kill process'),
                functions={
                     'Back': self.main.back,
-                    'Kill process': self.select_task_method,
-                    'Search': self.search
+                    'Kill process': self.select_task_method
                }
           )
           self.main.config(menu=menu)
@@ -64,11 +64,6 @@ class TaskManagerWindow:
           
           for d in data:
                self.main.tree.insert('', 'end', values=d)
-               
-               
-     def search(self) -> None:
-          return None
-     
      
      def select_task_method(self) -> None:
           selection = self.main.tree.selection()
@@ -120,12 +115,12 @@ class AutoloadWindow:
           for widget in self.main.winfo_children():
                if '.!entry' == str(widget):
                     return None
+               
+          selection = self.main.tree.selection()
+          if not selection:
+               return showwarning('Warning', 'You have not selected a column.')
           
           def rename_in_winreg() -> None:
-               selection = self.main.tree.selection()
-               if not selection:
-                    return showwarning('Warning', 'You have not selected a column.')
-               
                if not self.entry_text.get():
                     return showwarning('Warning', 'You have not entered a new name.')
           
@@ -145,15 +140,15 @@ class AutoloadWindow:
           self.entry_text = tk.Entry(
                self.main,
                fg='black',
-               width=20
+               width=45
           )
           self.entry_button = ttk.Button(
                self.main,
                text='Rename',
                command=rename_in_winreg
           )
-          self.entry_text.pack(anchor='sw')
-          self.entry_button.pack(anchor='sw', side='top')
+          self.entry_text.pack(anchor='sw', side='left')
+          self.entry_button.pack(anchor='sw', side='left')
           self.entry_text.bind('<Escape>', kill_entry_and_button)
           
           
@@ -214,7 +209,46 @@ class WinlogonWindow:
           
      
      def rename(self) -> None:
-          return None
+          for widget in self.main.winfo_children():
+               if '.!entry' == str(widget):
+                    return None
+               
+          selection = self.main.tree.selection()
+          if not selection:
+               return showwarning('Warning', 'First you need to select a column')
+
+          name, value = self.main.tree.item(selection[0])['values']
+          def rename_winlogon_value() -> None:
+               if not self.rename_entry.get():
+                    return showerror('Error', 'Empty string!')
+               
+               try:
+                    with winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, self.sub, 0, winreg.KEY_WRITE) as registry:
+                         winreg.SetValueEx(registry, name, 0, winreg.REG_SZ, self.rename_entry.get())
+               
+               except (FileNotFoundError, PermissionError) as ex:
+                    return showerror('Windows error', ex)
+               return self.main.replace_winlogon_window()
+          
+          
+          def kill_entry_and_button(event) -> None:
+               self.rename_entry.destroy()
+               self.rename_button.destroy()
+               
+          self.rename_entry = tk.Entry(
+               self.main,
+               fg='black',
+               width=45
+          )
+          self.rename_button = ttk.Button(
+               self.main,
+               text='Rename',
+               command=rename_winlogon_value
+          )
+          self.rename_entry.insert(0, value)
+          self.rename_entry.pack(anchor='sw', side='left')
+          self.rename_button.pack(anchor='sw', side='left')
+          self.rename_entry.bind('<Escape>', kill_entry_and_button)
           
           
      def winlogon_window(self) -> None:
@@ -263,6 +297,7 @@ class WinlogonWindow:
           
      
 class Main(tk.Tk):
+     
      def __init__(self) -> None:
           super().__init__()
           
@@ -286,7 +321,7 @@ class Main(tk.Tk):
                command=self.replace_task_window
           ).place(anchor='center', x=200, y=170)
           
-          self.button_task = ttk.Button(
+          self.button_autoload = ttk.Button(
                self,
                text='Autoload',
                padding=15,
@@ -294,13 +329,25 @@ class Main(tk.Tk):
                command=self.replace_autoload_window
           ).place(anchor='center', x=400, y=170)
           
-          self.button_task = ttk.Button(
+          self.button_winlogon = ttk.Button(
                self,
                text='Winlogon',
                padding=15,
                width=20,
                command=self.replace_winlogon_window
           ).place(anchor='center', x=300, y=235)
+          
+          self.button_reboot = ttk.Button(
+               self,
+               text='Rebot',
+               command=self.reboot
+          ).pack(side='left', anchor='sw')
+          
+          self.button_shutdown = ttk.Button(
+               self,
+               text='Shutdown',
+               command=self.shutdown
+          ).pack(side='left', anchor='sw')
           
           
           
@@ -326,6 +373,14 @@ class Main(tk.Tk):
           for widget in self.winfo_children():
                widget.destroy()
           self.main_window()
+          
+          
+     def reboot(self) -> None:
+          os.system('shutdown -r -t 00')
+     
+     
+     def shutdown(self) -> None:
+          os.system('shutdown -s -t 00')
     
     
 if __name__ == '__main__': 
